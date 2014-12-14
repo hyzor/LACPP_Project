@@ -60,3 +60,6 @@ local.properties
 
 # TeXlipse plugin
 .texlipse
+
+Debug/
+Release/
