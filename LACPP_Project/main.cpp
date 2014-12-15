@@ -8,33 +8,20 @@
 //*****************************************************************************************
 
 #include <iostream>
+#include <thread>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <sys/time.h>
 
+#include "EdgeDetection.h"
+#include "ImageProcessingUtil.h"
+
 #define USE_COMMANDLINE 0
 
-// Compute x component of the gradient vector at a given point in an image
-int xGradient(cv::Mat image, int x, int y)
+void test()
 {
-	return image.at<uchar>(y - 1, x - 1) +
-			2 * image.at<uchar>(y, x + 1) +
-				image.at<uchar>(y + 1, x - 1) -
-				image.at<uchar>(y - 1, x + 1) -
-			2 * image.at<uchar>(y, x + 1) -
-				image.at<uchar>(y + 1, x + 1);
-}
 
-// Compute y component of the gradient vector at a given point in an image
-int yGradient(cv::Mat image, int x, int y)
-{
-	return image.at<uchar>(y - 1, x - 1) +
-			2 * image.at<uchar>(y - 1, x) +
-				image.at<uchar>(y - 1, x + 1) -
-				image.at<uchar>(y + 1, x - 1) -
-			2 * image.at<uchar>(y + 1, x) -
-				image.at<uchar>(y + 1, x + 1);
 }
 
 int main(int argc, char* argv[])
@@ -45,8 +32,11 @@ int main(int argc, char* argv[])
 	std::string inputFile = "Valve_original_(1).PNG";
 
 	// Timer
-	timeval t1, t2;
+	timeval t1_seq, t2_seq;
+	timeval t1_threads, t2_threads;
 	double elapsedTime;
+
+	EdgeDetection edgeDetection;
 
 	// Use command line argument
 	if (USE_COMMANDLINE)
@@ -67,60 +57,66 @@ int main(int argc, char* argv[])
 	{}
 
 	// Load image
-	cv::Mat img_src, img_dest;
-	img_src = cv::imread(inputFile, CV_LOAD_IMAGE_GRAYSCALE);
-	img_dest = img_src.clone(); // Clone the source image into our destination image
+	cv::Mat* img_src;
+	cv::Mat img_dest_seq, img_dest_threads;
+	img_src = new cv::Mat(cv::imread(inputFile, CV_LOAD_IMAGE_GRAYSCALE));
+	//img_src = cv::imread(inputFile, CV_LOAD_IMAGE_GRAYSCALE);
+	//img_dest = img_src->clone(); // Clone the source image into our destination image
 								// so that the dimensions are identical
 
+	// Failed to allocate memory for image
+	if (!img_src)
+	{
+		std::cout << "Failed to allocate memory for image " << inputFile << "\n";
+		return 1;
+	}
+
 	// Img has failed to load
-	if (!img_src.data)
+	if (!img_src->data)
 	{
 		std::cout << "Could not load image " << inputFile << "\n";
 		return 1;
 	}
 
-	// Clear the data in our destination image - we don't want the source image data
-	for (int y = 0; y < img_src.rows; ++y)
-	{
-		for (int x = 0; x < img_src.cols; ++x)
-		{
-			img_dest.at<uchar>(y, x) = 0.0;
-		}
-	}
+	std::thread testThread(test);
 
-	gettimeofday(&t1, NULL);
+	// Run and measure sequential version
+	gettimeofday(&t1_seq, NULL);
+	img_dest_seq = edgeDetection.ProcessImg(img_src, EdgeDetection::NONE, 1);
+	gettimeofday(&t2_seq, NULL);
 
-	// Now process our destination image with edge detection using the Sobel operator
-	// TODO: Parallelize using threads and locks
-	// TODO: Parallelize using tasks
-	int gx, gy, sum;
-	gx = gy = sum = 0;
-	for (int y = 1; y < img_src.rows - 1; ++y)
-	{
-		for (int x = 1; x < img_src.cols - 1; x++)
-		{
-			gx = xGradient(img_src, x, y);
-			gy = yGradient(img_src, x, y);
-			sum = abs(gx) + abs(gy);
-			sum = sum > 255 ? 255:sum;
-			sum = sum < 0 ? 0 : sum;
-			img_dest.at<uchar>(y, x) = sum;
-		}
-	}
+	// Run and measure threads and locks version
+	gettimeofday(&t1_threads, NULL);
+	img_dest_threads = edgeDetection.ProcessImg(img_src, EdgeDetection::THREADS_AND_LOCKS, 10);
+	gettimeofday(&t2_threads, NULL);
 
-	gettimeofday(&t2, NULL);
+	std::cout << "------------------\nElapsed\n------------------\n";
 
 	// Elapsed time in ms
-	elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;		// (Total s -> ms)
-	elapsedTime += (t2.tv_usec - t1.tv_usec) * 0.001;	// (+ Total us -> ms)
-	std::cout << "Elapsed: " << elapsedTime << "ms\n";
+	elapsedTime = (t2_seq.tv_sec - t1_seq.tv_sec) * 1000.0;		// (Total s -> ms)
+	elapsedTime += (t2_seq.tv_usec - t1_seq.tv_usec) * 0.001;	// (+ Total us -> ms)
+	std::cout << "Sequential: " << elapsedTime << "ms\n";
+
+	elapsedTime = (t2_threads.tv_sec - t1_threads.tv_sec) * 1000.0;		// (Total s -> ms)
+	elapsedTime += (t2_threads.tv_usec - t1_threads.tv_usec) * 0.001;	// (+ Total us -> ms)
+	std::cout << "Threads: " << elapsedTime << "ms\n";
 
 	cv::namedWindow("Original");
-	cv::imshow("Original", img_src);
+	cv::imshow("Original", *img_src);
 
-	cv::namedWindow("Result");
-	cv::imshow("Result", img_dest);
+	cv::namedWindow("Result (sequential)");
+	cv::imshow("Result (sequential)", img_dest_seq);
+
+	cv::namedWindow("Result (threads and locks)");
+	cv::imshow("Result (threads and locks)", img_dest_threads);
 
 	cv::waitKey(0);
+
+	if (img_src)
+	{
+		delete img_src;
+		img_src = nullptr;
+	}
+
 	return 0;
 }
