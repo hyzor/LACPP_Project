@@ -1,6 +1,10 @@
 LACPP_Project
 =============
-Sequential edge detection algorithm using the Sobel operator.
+Sequential, threaded and task-based edge detection algorithm using the Sobel operator.
+
+####Todo
+- Write more comments in code (explain vital parts in code with comments)
+- Write report
 
 ####How to build
 
