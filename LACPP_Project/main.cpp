@@ -10,12 +10,7 @@
 #include "EdgeDetection.h"
 #include "ImageProcessingUtil.h"
 
-#define USE_COMMANDLINE 0
-
-void test()
-{
-
-}
+#define USE_COMMANDLINE 1
 
 int main(int argc, char* argv[])
 {
@@ -23,6 +18,7 @@ int main(int argc, char* argv[])
 	// The test image can be fetched from Wikipedia at:
 	// http://commons.wikimedia.org/wiki/File:Valve_original_(1).PNG
 	std::string inputFile = "Valve_original_(1).PNG";
+	unsigned int num_threads = 10;
 
 	// Timer
 	timeval t1_seq, t2_seq;
@@ -36,19 +32,22 @@ int main(int argc, char* argv[])
 	if (USE_COMMANDLINE)
 	{
 		// Use did not specify image path and name
-		if (argc < 2)
+		if (argc < 3)
 		{
-			std::cout << "Usage: ./LACPP_Project IMAGE_PATH\n";
+			std::cout << "Usage: ./LACPP_Project IMAGE_PATH NUM_THREADS\n";
 
 			return 1;
 		}
 
 		inputFile = std::string(argv[1]);
+		num_threads = atoi(argv[2]);
 	}
 
 	// Do not use command line argument
 	else
 	{}
+
+	std::cout << "Using " << num_threads << " threads\n";
 
 	// Load image
 	cv::Mat* img_src;
@@ -72,21 +71,19 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	std::thread testThread(test);
-
 	// Run and measure sequential version
 	gettimeofday(&t1_seq, NULL);
-	img_dest_seq = edgeDetection.ProcessImg(img_src, EdgeDetection::NONE, 1);
+	img_dest_seq = edgeDetection.ProcessImg(img_src, EdgeDetection::NONE, num_threads);
 	gettimeofday(&t2_seq, NULL);
 
 	// Run and measure threads and locks version
 	gettimeofday(&t1_threads, NULL);
-	img_dest_threads = edgeDetection.ProcessImg(img_src, EdgeDetection::THREADS_AND_LOCKS, 10);
+	img_dest_threads = edgeDetection.ProcessImg(img_src, EdgeDetection::THREADS_AND_LOCKS, num_threads);
 	gettimeofday(&t2_threads, NULL);
 
 	// Run and measure tasks version
 	gettimeofday(&t1_tasks, NULL);
-	img_dest_tasks = edgeDetection.ProcessImg(img_src, EdgeDetection::TASKS, 10);
+	img_dest_tasks = edgeDetection.ProcessImg(img_src, EdgeDetection::TASKS, num_threads);
 	gettimeofday(&t2_tasks, NULL);
 
 	std::cout << "------------------\nElapsed\n------------------\n";

@@ -8,15 +8,10 @@
 #include "EdgeDetection.h"
 
 EdgeDetection::EdgeDetection()
-{
-	// TODO Auto-generated constructor stub
-
-}
+{}
 
 EdgeDetection::~EdgeDetection()
-{
-	// TODO Auto-generated destructor stub
-}
+{}
 
 cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMethod, unsigned int num_threads)
 {
@@ -43,7 +38,7 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 	//-------------------------------------------
 	if (parallelMethod == ParallelMethod::NONE)
 	{
-		std::cout << "Running sequential version...\n";
+		//std::cout << "Running sequential version...\n";
 
 		// Now process our destination image with edge detection using the Sobel operator
 		for (int y = 1; y < img_src->rows - 1; ++y)
@@ -53,7 +48,7 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 				img_dest.at<uchar>(y, x) = ImageProcessingUtil::GetSobelOperator(img_src, x, y);
 			}
 		}
-		std::cout << "...Done!\n";
+		//std::cout << "...Done!\n";
 	}
 
 	//-------------------------------------------
@@ -61,14 +56,14 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 	//-------------------------------------------
 	else if (parallelMethod == ParallelMethod::THREADS_AND_LOCKS)
 	{
-		std::cout << "Running threads and locks version...\n";
+		//std::cout << "Running threads and locks version...\n";
 		std::mutex mtx;
 
 		// Number of rows are less than the amount of threads requested,
 		// spawn threads equal to the number of rows
 		if ((unsigned int)img_src->rows < num_threads)
 		{
-
+			num_threads = (unsigned int)img_src->rows;
 		}
 
 		// Spawn the maximum number of threads
@@ -84,26 +79,27 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 
 			std::thread myThreads[num_threads];
 
-			if (rows_rest == 0)
+			// There is an equal amount of rows per thread
+
+			//std::cout << "There is an equal amount of rows per threads!\n";
+
+			for (unsigned int i = 0; i < num_threads; ++i)
 			{
-				std::cout << "There are an equal amount of rows per threads!\n";
+				unsigned int curRowsPerThread = rowsPerThread
+								+ (i < rows_rest ? 1 : 0);	// Add rest row, if any
+				unsigned int rowStart = (i * curRowsPerThread) + 1;
+				myThreads[i] = std::thread(&EdgeDetection::ThreadFunc, this, img_src,
+									&img_dest, rowStart, (rowStart + curRowsPerThread),
+									std::ref(mtx));
+			}
 
-				for (unsigned int i = 0; i < num_threads; ++i)
-				{
-					unsigned int rowStart = (i * rowsPerThread) + 1;
-					myThreads[i] = std::thread(&EdgeDetection::ThreadFunc, this, img_src,
-										&img_dest, rowStart, (rowStart + rowsPerThread),
-										std::ref(mtx));
-				}
-
-				for (unsigned int i = 0; i < num_threads; ++i)
-				{
-					myThreads[i].join();
-				}
+			for (unsigned int i = 0; i < num_threads; ++i)
+			{
+				myThreads[i].join();
 			}
 		}
 
-		std::cout << "...Done!\n";
+		//std::cout << "...Done!\n";
 	}
 
 	//-------------------------------------------
@@ -111,19 +107,39 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 	//-------------------------------------------
 	else if (parallelMethod == ParallelMethod::TASKS)
 	{
+		//std::cout << "Running tasks version...\n";
+
+		unsigned int tasksPerThread = 2;
+
+		// Number of rows are less than the amount of threads requested,
+		// spawn threads equal to the number of rows
+		if ((unsigned int)img_src->rows < num_threads)
+		{
+			num_threads = (unsigned int)img_src->rows;
+			tasksPerThread = 1;
+		}
+
 		ThreadPool* pool = new ThreadPool(num_threads);
 		std::vector<std::future<unsigned int>> results;
 
-		unsigned int numTasks = num_threads * 2;
+		unsigned int numTasks = num_threads * tasksPerThread;
 
 		unsigned int rowsPerTask = (unsigned int)img_src->rows / numTasks;
+		unsigned int rows_rest = (unsigned int)img_src->rows % numTasks;
+
+		std::cout << "Tasks: " << numTasks << "\n" <<
+				"Rows/task: " << rowsPerTask << "\n";
+		std::cout << "Rows rest: " << rows_rest << "\n";
 
 		Task(img_src, 0, (0 + 0), 0, &img_dest);
 
 		// Add all the tasks, and store their results
 		for (unsigned int i = 0; i < numTasks; ++i)
 		{
-			unsigned int rowStart = (i * rowsPerTask) + 1;
+			unsigned int curRowsPerTask = rowsPerTask
+							+ (i < rows_rest ? 1 : 0);	// Add rest row, if any
+
+			unsigned int rowStart = (i * curRowsPerTask) + 1;
 
 			results.emplace_back(
 					// Wrap task function into the lamba function
@@ -131,7 +147,7 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 		            		unsigned int rowEnd, unsigned int id, cv::Mat* img_dest)
 					{
 						return edgeObj->Task(img_src, rowStart, rowEnd, id, img_dest);
-		            }, this, img_src, rowStart, (rowStart + rowsPerTask), i, &img_dest)
+		            }, this, img_src, rowStart, (rowStart + curRowsPerTask), i, &img_dest)
 					);
 		}
 
@@ -144,6 +160,8 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 		// Shutdown thread pool
 		pool->Shutdown();
 		delete pool;
+
+		//std::cout << "...Done!\n";
 	}
 
 	return img_dest;
