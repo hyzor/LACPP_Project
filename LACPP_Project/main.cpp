@@ -101,6 +101,7 @@ int main(int argc, char* argv[])
 	elapsedTime += (t2_tasks.tv_usec - t1_tasks.tv_usec) * 0.001;	// (+ Total us -> ms)
 	std::cout << "Tasks: " << elapsedTime << "ms\n";
 
+	/*
 	cv::namedWindow("Original");
 	cv::imshow("Original", *img_src);
 
@@ -112,6 +113,11 @@ int main(int argc, char* argv[])
 
 	cv::namedWindow("Result (tasks)");
 	cv::imshow("Result (tasks)", img_dest_tasks);
+	*/
+
+	cv::imwrite("seq_" + inputFile, img_dest_seq);
+	cv::imwrite("threads_" + inputFile, img_dest_threads);
+	cv::imwrite("tasks_" + inputFile, img_dest_tasks);
 
 	cv::waitKey(0);
 
