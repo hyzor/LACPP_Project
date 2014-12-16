@@ -2,10 +2,6 @@ LACPP_Project
 =============
 Sequential, threaded and task-based edge detection algorithm using the Sobel operator.
 
-####Todo
-- Write more comments in code (explain vital parts in code with comments)
-- Write report
-
 ####How to build
 
 Since OpenCV is used to load the images, the libraries for OpenCV has to be linked when building.
