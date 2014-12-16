@@ -1,3 +1,10 @@
+// File: ImageProcessingUtil.cpp
+//*****************************************************************************************
+// This file contains an edge detection algorithm using Sobel, the original author is
+// Bibek Subedi and his code can be found at:
+// http://www.programming-techniques.com/2013/03/sobel-and-prewitt-edge-detector-in-c.html
+//*****************************************************************************************
+
 #include "ImageProcessingUtil.h"
 
 /*

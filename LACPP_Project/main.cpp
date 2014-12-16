@@ -1,11 +1,4 @@
 // File: main.cpp
-//*****************************************************************************************
-// This file contains an edge detection algorithm using Sobel, the original author is
-// Bibek Subedi and his code can be found at:
-// http://www.programming-techniques.com/2013/03/sobel-and-prewitt-edge-detector-in-c.html
-//
-// The purpose of this program is simply to parallelize the original algorithm.
-//*****************************************************************************************
 
 #include <iostream>
 #include <thread>
@@ -34,6 +27,7 @@ int main(int argc, char* argv[])
 	// Timer
 	timeval t1_seq, t2_seq;
 	timeval t1_threads, t2_threads;
+	timeval t1_tasks, t2_tasks;
 	double elapsedTime;
 
 	EdgeDetection edgeDetection;
@@ -58,7 +52,7 @@ int main(int argc, char* argv[])
 
 	// Load image
 	cv::Mat* img_src;
-	cv::Mat img_dest_seq, img_dest_threads;
+	cv::Mat img_dest_seq, img_dest_threads, img_dest_tasks;
 	img_src = new cv::Mat(cv::imread(inputFile, CV_LOAD_IMAGE_GRAYSCALE));
 	//img_src = cv::imread(inputFile, CV_LOAD_IMAGE_GRAYSCALE);
 	//img_dest = img_src->clone(); // Clone the source image into our destination image
@@ -90,6 +84,11 @@ int main(int argc, char* argv[])
 	img_dest_threads = edgeDetection.ProcessImg(img_src, EdgeDetection::THREADS_AND_LOCKS, 10);
 	gettimeofday(&t2_threads, NULL);
 
+	// Run and measure tasks version
+	gettimeofday(&t1_tasks, NULL);
+	img_dest_tasks = edgeDetection.ProcessImg(img_src, EdgeDetection::TASKS, 10);
+	gettimeofday(&t2_tasks, NULL);
+
 	std::cout << "------------------\nElapsed\n------------------\n";
 
 	// Elapsed time in ms
@@ -99,7 +98,11 @@ int main(int argc, char* argv[])
 
 	elapsedTime = (t2_threads.tv_sec - t1_threads.tv_sec) * 1000.0;		// (Total s -> ms)
 	elapsedTime += (t2_threads.tv_usec - t1_threads.tv_usec) * 0.001;	// (+ Total us -> ms)
-	std::cout << "Threads: " << elapsedTime << "ms\n";
+	std::cout << "Threads and locks: " << elapsedTime << "ms\n";
+
+	elapsedTime = (t2_tasks.tv_sec - t1_tasks.tv_sec) * 1000.0;		// (Total s -> ms)
+	elapsedTime += (t2_tasks.tv_usec - t1_tasks.tv_usec) * 0.001;	// (+ Total us -> ms)
+	std::cout << "Tasks: " << elapsedTime << "ms\n";
 
 	cv::namedWindow("Original");
 	cv::imshow("Original", *img_src);
@@ -109,6 +112,9 @@ int main(int argc, char* argv[])
 
 	cv::namedWindow("Result (threads and locks)");
 	cv::imshow("Result (threads and locks)", img_dest_threads);
+
+	cv::namedWindow("Result (tasks)");
+	cv::imshow("Result (tasks)", img_dest_tasks);
 
 	cv::waitKey(0);
 

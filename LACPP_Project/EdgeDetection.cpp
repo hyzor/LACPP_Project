@@ -106,7 +106,69 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 		std::cout << "...Done!\n";
 	}
 
+	//-------------------------------------------
+	// Process image using tasks
+	//-------------------------------------------
+	else if (parallelMethod == ParallelMethod::TASKS)
+	{
+		unsigned int poolSize = 10;
+		ThreadPool* pool = new ThreadPool(poolSize);
+		std::vector<std::future<unsigned int>> results;
+
+		unsigned int numTasks = poolSize * 2;
+
+		unsigned int rowsPerTask = (unsigned int)img_src->rows / numTasks;
+
+		Task(img_src, 0, (0 + 0), 0, &img_dest);
+
+		// Add all the tasks, and store their results
+		for (unsigned int i = 0; i < numTasks; ++i)
+		{
+			unsigned int rowStart = (i * rowsPerTask) + 1;
+
+			results.emplace_back(
+					// Wrap task function into the lamba function
+		            pool->AddTask([](EdgeDetection* edgeObj, const cv::Mat* img_src, unsigned int rowStart,
+		            		unsigned int rowEnd, unsigned int id, cv::Mat* img_dest)
+					{
+						return edgeObj->Task(img_src, rowStart, rowEnd, id, img_dest);
+		            }, this, img_src, rowStart, (rowStart + rowsPerTask), i, &img_dest)
+					);
+		}
+
+		// Collect results when all tasks have finished
+		//for (unsigned int i = 0; i < results.size(); ++i)
+		//{
+			//std::cout << results[i].get() << "\n";
+		//}
+
+		// Shutdown thread pool
+		pool->Shutdown();
+		delete pool;
+	}
+
 	return img_dest;
+}
+
+unsigned int EdgeDetection::Task(const cv::Mat* img_src, unsigned int rowStart,
+		unsigned int rowEnd, unsigned int id, cv::Mat* img_dest)
+{
+	//unsigned int numRows = rowEnd - rowStart;
+	//std::map<int, int**> map;
+
+	// Cache local pixel data for this task
+	for (unsigned int y = rowStart; y < rowEnd; ++y)
+	{
+		for (int x = 1; x < img_src->cols - 1; ++x)
+		{
+			//pixelData[y][x] = ImageProcessingUtil::GetSobelOperator(img_src, x, (y + rowStart));
+			img_dest->at<uchar>(y, x) = ImageProcessingUtil::GetSobelOperator(img_src, x, y);
+		}
+	}
+
+	//map[id] = pixelData;
+
+	return id;
 }
 
 void EdgeDetection::ThreadFunc(const cv::Mat* img_src,
