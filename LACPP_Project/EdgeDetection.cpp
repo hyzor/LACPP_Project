@@ -111,8 +111,7 @@ cv::Mat EdgeDetection::ProcessImg(const cv::Mat* img, unsigned int parallelMetho
 	//-------------------------------------------
 	else if (parallelMethod == ParallelMethod::TASKS)
 	{
-		unsigned int poolSize = 10;
-		ThreadPool* pool = new ThreadPool(poolSize);
+		ThreadPool* pool = new ThreadPool(num_threads);
 		std::vector<std::future<unsigned int>> results;
 
 		unsigned int numTasks = poolSize * 2;
